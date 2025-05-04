@@ -12,7 +12,7 @@ stocks = ['AAPL']
 
 #BUGS
 # RL AGENT ONLY SENDING 5 BUY/SELL
- 
+# FALSE BUY/SELL
 
 
 

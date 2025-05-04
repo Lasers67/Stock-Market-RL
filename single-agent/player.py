@@ -46,11 +46,9 @@ class Player():
                     current_price = get_current_price(episode, t)
                     #print(idx, action[idx])
                     if(idx == 0):
-                        #print( "BUYING")
                         portfolio, cash = buy(abs(action[idx]), current_price, self.state[1], self.state[2],'AAPL')
                         next_state = (current_price, portfolio, cash)
                     elif(idx == 2):
-                        #print("SELLING")
                         portfolio, cash = sell(abs(action[idx]), current_price, self.state[1], self.state[2],'AAPL')
                         next_state = (current_price, portfolio, cash)
                     reward = get_current_reward(next_state, self.state)
