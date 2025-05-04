@@ -23,9 +23,9 @@ def sell(num_stocks, price, potfolio, in_hand_cash, stock):
         return potfolio, in_hand_cash
     if price <= 0:
         return potfolio, in_hand_cash
-    if potfolio[stock] < 0:
+    if potfolio[stock] < num_stocks:
         return potfolio, in_hand_cash
-    if potfolio[stock] < num_stocks * price:
+    if in_hand_cash < num_stocks * price:
         return potfolio, in_hand_cash
     potfolio[stock] -= num_stocks
     in_hand_cash += num_stocks * price
