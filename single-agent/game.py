@@ -12,8 +12,7 @@ stocks = ['AAPL']
 
 #BUGS
 # RL AGENT ONLY SENDING 5 BUY/SELL
-# FALSE BUY/SELL
-
+# ADD MULTIPLE STOCKS
 
 
 
@@ -26,7 +25,7 @@ df['Datetime'] = pd.to_datetime(df['Datetime']).dt.tz_convert(None)
 # Extract date and sort
 df['Date'] = df['Datetime'].dt.date
 unique_dates = sorted(df['Date'].unique(), reverse=True)
-date_to_episode = {date: i+1 for i, date in enumerate(unique_dates)}
+date_to_episode = {date: len(unique_dates) - i for i, date in enumerate(unique_dates)}
 df['episode'] = df['Date'].map(date_to_episode)
 
 # Create time steps within each episode
@@ -55,8 +54,9 @@ df_test = df_test.sort_values(by='Datetime', ascending=True)
 for stock in stocks:
     portfolio[stock] = 0
 init_state = (df[(df['episode'] == 1) & (df['time'] == 1)]['Close'].values[0],portfolio, cash)
-player = Player(method='RL', init_state=init_state, data=df)
+player = Player(method='RL', init_state=init_state, data=df, stock_name='AAPL')
 def send_email(action, num_stocks, price, time):
+    #TELEGRAM
     sender = "datastockmarket5@gmail.com"          # Your Gmail address
     app_password = "Data123456"        # Use App Password if 2FA is on
     recipient = "datastockmarket5@gmail.com"             # Receiver's email

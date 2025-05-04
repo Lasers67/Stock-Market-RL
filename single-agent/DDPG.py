@@ -13,10 +13,10 @@ class Actor(nn.Module):
         self.l3 = nn.Linear(300, action_dim)
         self.max_action = max_action
 
-    def forward(self, state):
-        x = F.relu(self.l1(state))
+    def forward(self, x):
+        x = F.relu(self.l1(x))
         x = F.relu(self.l2(x))
-        x = torch.tanh(self.l3(x)) * self.max_action
+        x = torch.sigmoid(self.l3(x))
         return x
 
 # Define the Critic Network
@@ -80,16 +80,24 @@ class DDPGAgent:
         self.replay_buffer = ReplayBuffer(100000)
         self.noise = OUNoise(action_dim)
         self.max_action = max_action
-        self.tau = 0.01
+        self.tau = 0.1
         self.gamma = 0.99
         self.batch_size = 64
 
     def act(self, state, add_noise=True):
+        price, num_stocks, cash = state
         state = torch.FloatTensor(state).unsqueeze(0)
         action = self.actor(state).detach().numpy()[0]
         if add_noise:
             noise = self.noise.sample()
-            action = np.clip(action + noise, -self.max_action, self.max_action)
+            action = action + noise
+        max_value = 10000
+        if np.argmax(action) == 0:
+            max_value = cash/price
+        if np.argmax(action) == 2:
+            max_value = num_stocks
+        max_value = min(max_value, self.max_action)
+        action = np.clip((action)*max_value, 0, max_value)
         return action
 
     def update(self):
@@ -116,7 +124,6 @@ class DDPGAgent:
 
         # Update Actor
         actor_loss = -self.critic(states, self.actor(states)).mean()
-
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
         self.actor_optimizer.step()
