@@ -11,9 +11,10 @@ def convert_state_to_vector(state):
     vector.append(cash)
     return vector
 class Player():
-    def __init__(self, method, init_state, data, stock_name='AAPL'):
+    def __init__(self, method, init_state, data, stock_name='AAPL', threshold=0.5):
         self.method = method
         self.actions = ['buy', 'sell', 'hold']
+        self.threshold = threshold
         self.state = {}
         self.init_state = init_state
         self.df = data
@@ -31,33 +32,27 @@ class Player():
         def get_current_price(episode, time):
             return self.df[(self.df['episode'] == episode+1) & (self.df['time'] == time+1)]['Close'].values[0]
         state_dim = 3
-        action_dim = 3
+        action_dim = 1
         max_action = 5 #MAX NUMBER OF STOCKS TO BE SOLD OR BOUGHT
-        self.agent = DDPGAgent(state_dim, action_dim, max_action)
-        for iter in range(5):
+        self.agent = DDPGAgent(state_dim, action_dim, max_action, threshold=self.threshold)
+        for iter in range(10):
             self.state = tuple(self.init_state) 
             self.state[1][self.stock_name] = 0
             for episode in range(470):
                 total_reward = 0
                 self.agent.noise.reset()
                 for t in range(7):
-                    random_int = random.randint(0, 10)
-                    if(iter<2 and random_int < 2):
-                        action = np.array([0, 0, 0])
-                        action[random.randint(0, 2)] = random.randint(1, max_action)
-                    else:
-                        action = self.agent.act(convert_state_to_vector(self.state))
-                    idx = np.argmax(action)
+                    action = self.agent.act(convert_state_to_vector(self.state))
                     next_state = self.state
                     current_price = get_current_price(episode, t)
-                    if(idx == 0):
-                        portfolio, cash = buy(abs(action[idx]), current_price, self.state[1], self.state[2],self.stock_name)
+                    if(action[0] >= self.threshold):
+                        portfolio, cash = buy(abs(action[0]), current_price, self.state[1], self.state[2],self.stock_name)
                         next_state = (current_price, portfolio, cash)
-                    elif(idx == 2):
-                        portfolio, cash = sell(abs(action[idx]), current_price, self.state[1], self.state[2],self.stock_name)
+                    elif(action[0] <= -self.threshold):
+                        portfolio, cash = sell(abs(action[0]), current_price, self.state[1], self.state[2],self.stock_name)
                         next_state = (current_price, portfolio, cash)
                     reward = get_current_reward(next_state, self.state)
-                    self.agent.replay_buffer.push(convert_state_to_vector(self.state), action, reward, convert_state_to_vector(next_state))
+                    self.agent.replay_buffer.push(convert_state_to_vector(self.state), [action[0]], reward, convert_state_to_vector(next_state))
                     self.agent.update()
                     self.state = next_state
                     total_reward += reward
@@ -68,11 +63,10 @@ class Player():
             if state is None:
                 raise ValueError("State must be provided for RL method.")
             action = self.agent.act(convert_state_to_vector(state), add_noise=False)
-            idx = np.argmax(action)
-            if(idx == 0):
-                return 'buy', abs(action[idx])
-            elif(idx == 2):
-                return 'sell', abs(action[idx])
+            if(action >= self.threshold):
+                return 'buy', abs(action)
+            elif(action <= -self.threshold):
+                return 'sell', abs(action)
             else:
                 return 'hold', 0
         else:

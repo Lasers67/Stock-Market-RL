@@ -12,13 +12,11 @@ class Actor(nn.Module):
         self.l2 = nn.Linear(400, 300)
         self.l3 = nn.Linear(300, action_dim)
         self.max_action = max_action
-
     def forward(self, x):
         x = F.relu(self.l1(x))
         x = F.relu(self.l2(x))
-        x = torch.sigmoid(self.l3(x))
-        return x
-
+        x = torch.tanh(self.l3(x))
+        return x * self.max_action
 # Define the Critic Network
 class Critic(nn.Module):
     def __init__(self, state_dim, action_dim):
@@ -33,7 +31,6 @@ class Critic(nn.Module):
         x = F.relu(self.l2(x))
         x = self.l3(x)
         return x
-
 class OUNoise:
     def __init__(self, action_dim, mu=0.0, theta=0.15, sigma=0.2):
         self.action_dim = action_dim
@@ -66,9 +63,10 @@ class ReplayBuffer:
         return len(self.buffer)
     
 class DDPGAgent:
-    def __init__(self, state_dim, action_dim, max_action,  learning_rate = 1e-4):
+    def __init__(self, state_dim, action_dim, max_action,  learning_rate = 1e-4, threshold=0.5):
         self.actor = Actor(state_dim, action_dim, max_action)
         self.actor_target = Actor(state_dim, action_dim, max_action)
+        self.threshold = threshold
         #self.actor_target.load_state_dict(self.actor.state_dict())
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=learning_rate)
 
@@ -80,24 +78,29 @@ class DDPGAgent:
         self.replay_buffer = ReplayBuffer(100000)
         self.noise = OUNoise(action_dim)
         self.max_action = max_action
-        self.tau = 0.1
+        self.tau = 0.05
         self.gamma = 0.99
         self.batch_size = 64
+        self.scale = 1
+        self.iteration = 1
 
     def act(self, state, add_noise=True):
         price, num_stocks, cash = state
         state = torch.FloatTensor(state).unsqueeze(0)
         action = self.actor(state).detach().numpy()[0]
+        self.iteration += 1
+        if self.iteration % 100 == 0:
+            self.scale *= 0.9
         if add_noise:
-            noise = self.noise.sample()
+            noise = self.noise.sample()*2*self.max_action * self.scale
             action = action + noise
         max_value = 10000
-        if np.argmax(action) == 0:
+        if action >= self.threshold:
             max_value = cash/price
-        if np.argmax(action) == 2:
+        if action <= -self.threshold:
             max_value = num_stocks
         max_value = min(max_value, self.max_action)
-        action = np.clip((action)*max_value, 0, max_value)
+        action = np.clip((action), -1*max_value, max_value)
         return action
 
     def update(self):
