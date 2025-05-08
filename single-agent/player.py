@@ -11,7 +11,7 @@ def convert_state_to_vector(state):
     vector.append(cash)
     return vector
 class Player():
-    def __init__(self, method, init_state, data, stock_name='AAPL', threshold=0.5):
+    def __init__(self, method, init_state, data, stock_name='RELIANCE', threshold=0.5):
         self.method = method
         self.actions = ['buy', 'sell', 'hold']
         self.threshold = threshold
@@ -38,7 +38,7 @@ class Player():
         for iter in range(10):
             self.state = tuple(self.init_state) 
             self.state[1][self.stock_name] = 0
-            for episode in range(470):
+            for episode in range(240):
                 total_reward = 0
                 self.agent.noise.reset()
                 for t in range(7):

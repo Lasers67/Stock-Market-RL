@@ -1,2 +1,3 @@
 .venv/
 hourly_data/
+serviceAccount.json

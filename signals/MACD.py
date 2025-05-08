@@ -1,14 +1,25 @@
-stocks = ['AAPL', 'MSFT', 'GOOGL']
 import pandas as pd
+import firebase_admin
+from firebase_admin import credentials, firestore
 
-folder = '../hourly_data/'
-data = {}
+stocks = ['RELIANCE']
+cred = credentials.Certificate("../serviceAccount.json")
+firebase_admin.initialize_app(cred)
+db = firestore.client()
+# Fetch data from Firestore
+data = []
 for stock in stocks:
-    file = folder + stock + '_hourly.csv'
-    df = pd.read_csv(file, skiprows=2)
-    df.columns = ['Datetime', 'Close', 'High', 'Low', 'Open', 'Volume']
+    docs = db.collection(stock).stream()
+    cnt = 0
+    for doc in docs:
+        cnt += 1
+        print(cnt)
+        data.append(doc.to_dict())
+    print(stock)
+    df = pd.DataFrame(data)
     df['Datetime'] = pd.to_datetime(df['Datetime']).dt.tz_convert(None)
     data[stock] = df
+    print(stock)
 
 
 def calculate_macd(df, short_window=12, long_window=26, signal_window=9):
@@ -47,7 +58,7 @@ def generate_signals(df):
     )
     df.loc[short_cond, 'Trade_Signal'] = -1  # Short signal
     return df
-
+print("DONE")
 for stock in stocks:
     df = data[stock]
     df = calculate_macd(df)

@@ -4,29 +4,36 @@ import random
 from player import Player
 import smtplib
 from email.mime.text import MIMEText
-# Define time range (naive datetimes)
-time_end = '2025-05-01 23:59:59'
+import firebase_admin
+from firebase_admin import credentials, firestore
+from datetime import datetime
+import pytz
+
+
+ist = pytz.timezone('Asia/Kolkata')
 cash = 10000
 portfolio = {}
-stocks = ['AAPL']
+stocks = ['RELIANCE']
 
-#BUGS
-# RL AGENT ONLY SENDING 5 BUY/SELL
-# ADD MULTIPLE STOCKS
-
-
-
-# Read and preprocess
-file = '../hourly_data/AAPL_hourly.csv'
-df = pd.read_csv(file, skiprows=2)
-df.columns = ['Datetime', 'Close', 'High', 'Low', 'Open', 'Volume']
-df['Datetime'] = pd.to_datetime(df['Datetime']).dt.tz_convert(None)
-
+# Read and preprocess data from firebase
+cred = credentials.Certificate("../serviceAccount.json")
+firebase_admin.initialize_app(cred)
+db = firestore.client()
+# Fetch data from Firestore
+data = []
+for stock in stocks:
+    docs = db.collection(stock).stream()
+    for doc in docs:
+        data.append(doc.to_dict())
+df = pd.DataFrame(data)
+df['Datetime'] = pd.to_datetime(df['Datetime'], utc=True)
 # Extract date and sort
 df['Date'] = df['Datetime'].dt.date
 unique_dates = sorted(df['Date'].unique(), reverse=True)
 date_to_episode = {date: len(unique_dates) - i for i, date in enumerate(unique_dates)}
 df['episode'] = df['Date'].map(date_to_episode)
+
+max_episodes = df['episode'].max()
 
 # Create time steps within each episode
 df = df.sort_values(['Date', 'Datetime'])  # Ensure it's sorted by date and time
@@ -45,7 +52,9 @@ for date in unique_dates:
 
 # Combine all padded days
 df = pd.concat(padded_rows, ignore_index=True)
-time_start = df.loc[(df['episode'] == 491) & (df['time'] == 1), 'Datetime'].values[0]
+time_start = df.loc[(df['episode'] == max_episodes-10) & (df['time'] == 1), 'Datetime'].values[0]
+time_end = datetime.now(ist).astimezone(pytz.utc)
+time_start = pd.to_datetime(time_start).tz_localize('UTC')
 df_test = df[(df['Datetime'] >= time_start) & (df['Datetime'] <= time_end)]
 df_test = df_test.sort_values(by='Datetime', ascending=True)
 
@@ -54,7 +63,7 @@ df_test = df_test.sort_values(by='Datetime', ascending=True)
 for stock in stocks:
     portfolio[stock] = 0
 init_state = (df[(df['episode'] == 1) & (df['time'] == 1)]['Close'].values[0],portfolio, cash)
-player = Player(method='RL', init_state=init_state, data=df, stock_name='AAPL')
+player = Player(method='RL', init_state=init_state, data=df, stock_name='RELIANCE')
 def send_email(action, num_stocks, price, time):
     #TELEGRAM
     sender = "datastockmarket5@gmail.com"          # Your Gmail address
@@ -79,19 +88,19 @@ def send_email(action, num_stocks, price, time):
 
 #send_email('buy', 10, 150, '2024-10-01 00:00:00')  # Example usage
 cash = 10000
-portfolio = {'AAPL': 0}
+portfolio = {'RELIANCE': 0}
 for index, row in df_test.iterrows():
     current_time = row['Datetime']
     current_price = row['Close']
     action, num_stocks = player.move((current_price, portfolio, cash))
     print(action, num_stocks)
     if action == 'buy':
-        portfolio, cash  = buy(num_stocks, current_price,portfolio, cash, 'AAPL')
+        portfolio, cash  = buy(num_stocks, current_price,portfolio, cash, 'RELIANCE')
         # send email to notify the user
         #send_email('buy', num_stocks, current_price, current_time)
 
     elif action == 'sell':
-        portfolio, cash  = sell(num_stocks, current_price,portfolio, cash, 'AAPL')
+        portfolio, cash  = sell(num_stocks, current_price,portfolio, cash, 'RELIANCE')
         #send_email('sell', num_stocks, current_price, current_time)
     print('Current time:', current_time)
     print('Current price:', current_price)
